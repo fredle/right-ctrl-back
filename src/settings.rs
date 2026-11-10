@@ -13,6 +13,9 @@ pub struct Settings {
     /// a day.
     #[serde(default)]
     pub last_update_check: u64,
+    /// What the AI key turns into.
+    #[serde(default)]
+    pub target: crate::keys::Target,
 }
 
 fn default_true() -> bool {
@@ -24,6 +27,7 @@ impl Default for Settings {
         Self {
             auto_update: true,
             last_update_check: 0,
+            target: crate::keys::Target::default(),
         }
     }
 }
@@ -48,5 +52,27 @@ pub fn save(settings: &Settings) {
     let _ = std::fs::create_dir_all(data_dir());
     if let Ok(json) = serde_json::to_string_pretty(settings) {
         let _ = std::fs::write(settings_path(), json);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn old_settings_files_still_load() {
+        let s: Settings = serde_json::from_str(r#"{"auto_update": false}"#).unwrap();
+        assert!(!s.auto_update);
+        assert_eq!(s.target, crate::keys::Target::RightCtrl);
+    }
+
+    #[test]
+    fn target_round_trips() {
+        let s = Settings {
+            target: crate::keys::Target::Launch("calc.exe".into()),
+            ..Default::default()
+        };
+        let back: Settings = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
+        assert_eq!(back.target, s.target);
     }
 }

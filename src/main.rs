@@ -6,6 +6,9 @@
 #![windows_subsystem = "windows"]
 
 mod app;
+mod engine;
+mod hook;
+mod keys;
 mod settings;
 mod update;
 
