@@ -12,6 +12,7 @@ combinations and with other keys.
 - Recognises the Win+Shift+F23 chord with a low-level keyboard hook and suppresses it
 - Maps it to a held Right Ctrl, the menu key, a media key, any single key, or launches an app
 - Key tester showing what the key sends and what the app sends instead
+- Starts with Windows, hidden in the tray, so the key is remapped after every restart (can be switched off)
 - Tray icon with Pause / Resume, Open and Quit; closing the window keeps it running
 - Keyboard shortcuts: Ctrl+P pause or resume, Ctrl+Q quit
 
@@ -27,13 +28,16 @@ combinations and with other keys.
 - Windows does not let a normal app see or send keys in windows running as administrator, so
   the AI key is not remapped while an elevated window has focus. This app never asks for
   elevation.
-- Only the AI key is remapped. It is not a general remapper, and it does not change the
-  registry or use macros.
+- Only the AI key is remapped. It is not a general remapper, it does not use keyboard
+  scancode maps, and it has no macros.
 
 ## Data
 
 Settings (your chosen target and the auto-update choice) are stored in
-`%LOCALAPPDATA%\RightCtrlBack\settings.json`. Nothing else is written to disk.
+`%LOCALAPPDATA%\RightCtrlBack\settings.json`. While "Start with Windows" is on, a
+per-user `RightCtrlBack` value is kept under
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`; switching the option off or
+uninstalling removes it. Nothing else is written.
 
 ## Privacy
 
