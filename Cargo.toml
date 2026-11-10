@@ -1,0 +1,22 @@
+[package]
+name = "right_ctrl_back"
+version = "0.1.0"
+edition = "2024"
+description = "Turn the AI key on new laptops back into Right Ctrl, or anything else you choose."
+repository = "https://github.com/fredle/right-ctrl-back"
+
+[dependencies]
+eframe = { version = "0.36.2", default-features = false, features = ["glow", "default_fonts"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+velopack = "1.2"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[build-dependencies]
+winresource = "0.1.31"

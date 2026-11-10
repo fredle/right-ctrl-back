@@ -1,0 +1,171 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  build-sign-release:
+    runs-on: windows-latest
+    environment: release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release binary
+        run: cargo build --release
+        shell: pwsh
+
+      - name: Run tests
+        run: cargo test --release
+        shell: pwsh
+
+      - name: Install vpk
+        shell: pwsh
+        run: |
+          dotnet tool install -g vpk
+          "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Download Trusted Signing client
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path trustedsigning | Out-Null
+          Invoke-WebRequest -Uri "https://www.nuget.org/api/v2/package/Microsoft.Trusted.Signing.Client" -OutFile trustedsigning\client.nupkg
+          Expand-Archive -Path trustedsigning\client.nupkg -DestinationPath trustedsigning\extracted -Force
+
+      - name: Write signing metadata
+        shell: pwsh
+        run: |
+          @'
+          {
+            "Endpoint": "https://weu.codesigning.azure.net/",
+            "CodeSigningAccountName": "leatham-signing-account",
+            "CertificateProfileName": "cert-profile"
+          }
+          '@ | Set-Content -Path trustedsigning\metadata.json -Encoding utf8
+
+      - name: Locate signtool
+        shell: pwsh
+        run: |
+          $signtool = Get-ChildItem -Recurse -Filter "signtool.exe" "C:\Program Files (x86)\Windows Kits\10\bin" |
+            Where-Object { $_.FullName -match "\\x64\\" } |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $signtool) { throw "signtool.exe not found" }
+          "SIGNTOOL=$signtool" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Pack and sign with Velopack
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^v',''
+          $repoAbs = (Resolve-Path ".").Path
+          $signTemplate = "`"$env:SIGNTOOL`" sign /v /debug /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256 " +
+            "/dlib `"$repoAbs\trustedsigning\extracted\bin\x64\Azure.CodeSigning.Dlib.dll`" " +
+            "/dmdf `"$repoAbs\trustedsigning\metadata.json`" `"{{file}}`""
+
+          # vpk packs everything under -p verbatim, so give it only the exe -
+          # never the raw cargo target dir.
+          New-Item -ItemType Directory -Force -Path target\publish | Out-Null
+          Copy-Item target\release\right_ctrl_back.exe target\publish\ -Force
+
+          vpk download github --repoUrl "https://github.com/${{ github.repository }}"
+
+          vpk pack `
+            -u RightCtrlBack `
+            -v $version `
+            -p target\publish `
+            -e right_ctrl_back.exe `
+            -i assets\app.ico `
+            --signTemplate $signTemplate
+          if ($LASTEXITCODE -ne 0) { throw "vpk pack failed with exit code $LASTEXITCODE" }
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        run: |
+          vpk upload github --repoUrl "https://github.com/${{ github.repository }}" --tag "$env:GITHUB_REF_NAME" --publish --token "${{ secrets.GITHUB_TOKEN }}"
+          if ($LASTEXITCODE -ne 0) { throw "vpk upload failed with exit code $LASTEXITCODE" }
+
+          $notes = gh api "repos/${{ github.repository }}/releases/generate-notes" -f tag_name="$env:GITHUB_REF_NAME" --jq .body
+          if ($LASTEXITCODE -eq 0 -and $notes) {
+            Set-Content -Path notes.md -Value $notes -Encoding utf8
+            gh release edit "$env:GITHUB_REF_NAME" --notes-file notes.md
+          }
+          $global:LASTEXITCODE = 0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload installer to blob storage
+        shell: pwsh
+        run: |
+          # The Store's Package URL validation rejects GitHub Release asset
+          # URLs (they 302 to a signed CDN URL); blob storage serves directly.
+          $version = $env:GITHUB_REF_NAME -replace '^v',''
+          $setup = Get-ChildItem "Releases" -Filter "*Setup.exe" | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $setup) { throw "no *Setup.exe found under Releases\" }
+          az storage blob upload `
+            --account-name leathamdl `
+            --container-name right-ctrl-back `
+            --name "$version/RightCtrlBackSetup.exe" `
+            --file "$setup" `
+            --auth-mode login `
+            --overwrite true
+          if ($LASTEXITCODE -ne 0) { throw "blob upload failed with exit code $LASTEXITCODE" }
+          "Package URL: https://leathamdl.blob.core.windows.net/right-ctrl-back/$version/RightCtrlBackSetup.exe" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      # Skipped until `factory store <slug> <product-guid>` sets
+      # STORE_PRODUCT_ID - i.e. until the first Store submission has been
+      # made by hand in Partner Center.
+      - name: Set up Microsoft Store Developer CLI
+        if: ${{ vars.STORE_PRODUCT_ID != '' }}
+        uses: microsoft/microsoft-store-apppublisher@v1.1
+
+      - name: Submit to Microsoft Store
+        if: ${{ vars.STORE_PRODUCT_ID != '' }}
+        shell: pwsh
+        env:
+          STORE_PRODUCT_ID: ${{ vars.STORE_PRODUCT_ID }}
+        run: |
+          msstore reconfigure `
+            --tenantId "${{ vars.AZURE_TENANT_ID }}" `
+            --sellerId "${{ vars.PARTNER_CENTER_SELLER_ID }}" `
+            --clientId "${{ vars.PARTNER_CENTER_CLIENT_ID }}" `
+            --clientSecret "${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}"
+          if ($LASTEXITCODE -ne 0) { throw "msstore reconfigure failed with exit code $LASTEXITCODE" }
+
+          $version = $env:GITHUB_REF_NAME -replace '^v',''
+          $url = "https://leathamdl.blob.core.windows.net/right-ctrl-back/$version/RightCtrlBackSetup.exe"
+
+          $raw = msstore submission get $env:STORE_PRODUCT_ID
+          if ($LASTEXITCODE -ne 0) { throw "msstore submission get failed with exit code $LASTEXITCODE" }
+          $submission = ($raw -join "`n") | ConvertFrom-Json
+
+          $pkg = $submission.Packages | Where-Object { $_.Architectures -contains 'X64' } | Select-Object -First 1
+          if (-not $pkg) { throw "no x64 package found in the Store submission" }
+          $pkg.PackageUrl = $url
+          $pkg.InstallerParameters = '--silent'
+          $pkg.IsSilentInstall = $false
+
+          $submission | ConvertTo-Json -Depth 100 | Set-Content -Path store-package.json -Encoding utf8
+
+          # Fails while a previous submission is still in certification.
+          msstore submission update $env:STORE_PRODUCT_ID --payload store-package.json
+          if ($LASTEXITCODE -ne 0) { throw "msstore submission update failed with exit code $LASTEXITCODE" }
+
+          msstore submission publish $env:STORE_PRODUCT_ID
+          if ($LASTEXITCODE -ne 0) { throw "msstore submission publish failed with exit code $LASTEXITCODE" }
+          "Submitted $url to the Microsoft Store for certification." | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8

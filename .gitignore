@@ -1,0 +1,4 @@
+target/
+Releases/
+trustedsigning/
+store-package.json
