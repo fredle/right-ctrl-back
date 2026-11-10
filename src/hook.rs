@@ -148,9 +148,9 @@ struct HookCtx {
 static CTX: OnceLock<HookCtx> = OnceLock::new();
 static SHARED: OnceLock<Arc<Shared>> = OnceLock::new();
 
-/// Returns true if another copy is already running (and asks it to show its
-/// window). Call before starting anything else.
-pub fn already_running() -> bool {
+/// Returns true if another copy is already running, and if `show` asks it to
+/// show its window. Call before starting anything else.
+pub fn already_running(show: bool) -> bool {
     unsafe {
         let name = wide(MUTEX_NAME);
         let handle = CreateMutexW(null(), 0, name.as_ptr());
@@ -158,6 +158,9 @@ pub fn already_running() -> bool {
         let _ = handle;
         const ERROR_ALREADY_EXISTS: u32 = 183;
         if GetLastError() == ERROR_ALREADY_EXISTS {
+            if !show {
+                return true;
+            }
             let class = wide(WINDOW_CLASS);
             let hwnd = FindWindowW(class.as_ptr(), null());
             if !hwnd.is_null() {

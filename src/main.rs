@@ -10,6 +10,7 @@ mod engine;
 mod hook;
 mod keys;
 mod settings;
+mod startup;
 mod update;
 
 fn main() {

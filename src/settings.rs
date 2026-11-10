@@ -16,6 +16,9 @@ pub struct Settings {
     /// What the AI key turns into.
     #[serde(default)]
     pub target: crate::keys::Target,
+    /// Launch hidden in the tray at sign-in.
+    #[serde(default = "default_true")]
+    pub start_with_windows: bool,
 }
 
 fn default_true() -> bool {
@@ -28,6 +31,7 @@ impl Default for Settings {
             auto_update: true,
             last_update_check: 0,
             target: crate::keys::Target::default(),
+            start_with_windows: true,
         }
     }
 }
@@ -64,6 +68,7 @@ mod tests {
         let s: Settings = serde_json::from_str(r#"{"auto_update": false}"#).unwrap();
         assert!(!s.auto_update);
         assert_eq!(s.target, crate::keys::Target::RightCtrl);
+        assert!(s.start_with_windows);
     }
 
     #[test]

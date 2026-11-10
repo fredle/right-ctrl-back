@@ -14,7 +14,10 @@ const CHECK_INTERVAL_SECS: u64 = 24 * 60 * 60;
 /// Must run before anything else in `main` - Velopack may terminate or
 /// restart the process to carry out an install/uninstall/update step.
 pub fn run_app_hooks() {
-    VelopackApp::build().run();
+    VelopackApp::build()
+        // Don't leave a Run entry pointing at a deleted exe.
+        .on_before_uninstall_fast_callback(|_| crate::startup::apply(false))
+        .run();
 }
 
 /// The running version, for display.
@@ -67,13 +70,14 @@ pub fn maybe_spawn_background_update() {
 }
 
 /// Body of the `--auto-update` child: check, download, and hand the apply
-/// step to Velopack, which waits for this process to exit. The new version
-/// runs on the next launch.
+/// step to Velopack, which waits for this process to exit. Applying closes
+/// the running tray app, so Velopack restarts it hidden in the tray;
+/// otherwise the AI key would stop working until the next sign-in.
 pub fn run_background_update() {
     let Some(info) = check() else { return };
     let Ok(um) = manager() else { return };
     if um.download_updates(&info, None).is_err() {
         return;
     }
-    let _ = um.wait_exit_then_apply_updates(&info.TargetFullRelease, true, false, [] as [&str; 0]);
+    let _ = um.wait_exit_then_apply_updates(&info.TargetFullRelease, true, true, [crate::startup::TRAY_ARG]);
 }

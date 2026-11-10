@@ -13,15 +13,18 @@ use crate::keys::{self, Kind, MEDIA_KEYS, Target};
 const WIDTH: f32 = 520.0;
 const HEIGHT: f32 = 560.0;
 
-pub fn run(_args: Vec<String>) -> eframe::Result<()> {
+pub fn run(args: Vec<String>) -> eframe::Result<()> {
+    let tray = crate::startup::wants_tray(&args);
     // A second copy would double-handle every key press; wake the first.
-    if hook::already_running() {
+    // (A sign-in or post-update launch with --tray just exits quietly.)
+    if hook::already_running(!tray) {
         return Ok(());
     }
     let viewport = egui::ViewportBuilder::default()
         .with_title("Right Ctrl Back")
         .with_inner_size([WIDTH, HEIGHT])
-        .with_min_inner_size([420.0, 420.0]);
+        .with_min_inner_size([420.0, 420.0])
+        .with_visible(!tray);
     let options = eframe::NativeOptions {
         viewport,
         ..Default::default()
@@ -59,6 +62,7 @@ pub fn status_line(state: HookState, paused: bool, target: &Target) -> (String, 
 impl App {
     fn new(ctx: egui::Context) -> Self {
         let settings = crate::settings::load();
+        crate::startup::apply(settings.start_with_windows);
         let shared = hook::start(ctx, settings.target.clone());
         Self {
             settings,
@@ -115,6 +119,16 @@ impl App {
 
         ui.add_space(10.0);
         ui.separator();
+        let mut start = self.settings.start_with_windows;
+        if ui
+            .checkbox(&mut start, "Start with Windows")
+            .on_hover_text("Starts hidden in the notification area when you sign in, so the AI key is always remapped.")
+            .changed()
+        {
+            self.settings.start_with_windows = start;
+            crate::startup::apply(start);
+            crate::settings::save(&self.settings);
+        }
         ui.weak(
             "Closing this window keeps Right Ctrl Back running in the notification area; \
              right-click its icon to pause or quit.",
