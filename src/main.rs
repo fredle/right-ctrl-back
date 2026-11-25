@@ -6,6 +6,10 @@
 #![windows_subsystem = "windows"]
 
 mod app;
+mod feedback;
+// Enough of the house theme for feedback.rs; `polish` brings the real one.
+#[path = "theme_lite.rs"]
+mod theme;
 mod engine;
 mod hook;
 mod keys;

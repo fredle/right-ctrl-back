@@ -18,7 +18,7 @@ Prefer something else? Send the menu key, a media key (play/pause, next, previou
 
 A built-in key tester shows exactly what your key sends and what Right Ctrl Back sends instead, so you can see it working. A tray icon lets you pause and resume, and closing the window keeps it running quietly in the background. It starts with Windows by default, so the key stays remapped after a restart.
 
-Simple and private: no account, no telemetry, no administrator rights, no system-wide changes. Settings are one small file in your user profile. The only network use is an optional daily update check.
+Simple and private: no account, no telemetry, no administrator rights, no system-wide changes. Settings are one small file in your user profile. The only network use is an optional daily update check, and a feedback note if you choose to send one.
 
 Good to know: Windows does not allow normal apps to see or send keys in windows running as administrator, so the key behaves as before while an elevated window has focus.
 
@@ -59,6 +59,8 @@ Utilities & tools / System utilities (alternative: Productivity)
 Stored locally: your chosen key target and the auto-update and start-with-Windows settings, in `%LOCALAPPDATA%\RightCtrlBack\settings.json`, plus a per-user startup entry while "Start with Windows" is on. Keystrokes are never saved or sent anywhere; the key tester shows keys only while switched on, in memory only.
 
 Network: one check for new versions against GitHub Releases about once a day, which can be turned off in the app. No telemetry, no analytics, no accounts, no ads.
+
+Feedback: the "What would make this better?" link in the window lets you send the developer a short note. Only the note, the app's name and version, and the platform are sent, to the developer's server at feedback.leatham.net, and only when you press Send. No name, email address or device identifier is sent, and the server does not keep IP addresses. Notes are used only to improve the app and are never shared or sold.
 
 ## Screenshot ideas
 

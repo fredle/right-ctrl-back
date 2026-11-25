@@ -39,6 +39,8 @@ pub fn run(args: Vec<String>) -> eframe::Result<()> {
 pub struct App {
     settings: crate::settings::Settings,
     version: String,
+    /// "What would make this better?" (src/feedback.rs).
+    feedback: crate::feedback::Feedback,
     shared: Arc<Shared>,
 }
 
@@ -67,6 +69,7 @@ impl App {
         Self {
             settings,
             version: crate::update::current_version(),
+            feedback: Default::default(),
             shared,
         }
     }
@@ -265,6 +268,8 @@ impl App {
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.weak(format!("v{}", self.version));
+                ui.add_space(8.0);
+                self.feedback.link(ui);
             });
         });
     }
@@ -291,6 +296,8 @@ impl eframe::App for App {
 
         egui::Panel::bottom("footer").show(ui_root, |ui| self.footer(ui));
         egui::CentralPanel::default().show(ui_root, |ui| self.main_ui(ui));
+            let feedback_ctx = ui_root.ctx().clone();
+        self.feedback.show(&feedback_ctx, &self.version, false);
     }
 }
 
