@@ -1,0 +1,5 @@
+# Link the C runtime into the exe, so it does not need the Visual C++
+# Redistributable (VCRUNTIME140.dll) on the user's machine. The Store flags
+# an undisclosed dependency on it (policy 10.2.4.1).
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
