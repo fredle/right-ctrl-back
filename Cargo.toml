@@ -1,6 +1,6 @@
 [package]
 name = "right_ctrl_back"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 description = "Turn the AI key on new laptops back into Right Ctrl, or anything else you choose."
 repository = "https://github.com/fredle/right-ctrl-back"
